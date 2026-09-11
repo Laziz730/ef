@@ -1,0 +1,27 @@
+# Secrets — hech qachon push qilinmaydi
+BOT_TOKEN.txt
+.env
+
+# Runtime / local fayllar
+.venv/
+__pycache__/
+*.pyc
+bot.log
+bot_err.log
+sonnet.lock
+output/
+users.json
+settings.json
+stats.json
+credits.json
+allowed_users.json
+emoji_pack.json
+refund_requests.json
+referrals.json
+price_name.json
+price_logo.json
+price_code.json
+
+# Windows launcher
+run.bat
+run_bot.ps1
