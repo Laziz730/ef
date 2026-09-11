@@ -1908,9 +1908,11 @@ def _start_http_keepalive():
     Ularda deploy bo'lishi uchun app $PORT da HTTP ga javob berishi shart
     (aks holda 'no port bound' deb deploy'ni bekor qiladi). Telegram bot
     HTTP server talab qilmaydi, shuning uchun kichkina keepalive serverini
-    alohida thread'da ishga tushiramiz."""
+    qo'shamiz. Port sinxron (darhol) bind qilinadi — deploy boshlanishida
+    port ochiq bo'lishi kafolatlanadi."""
     try:
-        port = int(os.environ.get("PORT", "8080"))
+        raw_port = str(os.environ.get("PORT", "8080"))
+        port = int(raw_port.split("-")[0].strip())
     except (TypeError, ValueError):
         port = 8080
 
@@ -1930,13 +1932,14 @@ def _start_http_keepalive():
         def log_message(self, *args):
             pass
 
-    def _run():
-        try:
-            HTTPServer(("0.0.0.0", port), _Handler).serve_forever()
-        except Exception as e:
-            logging.warning("HTTP keepalive server ishga tushmadi: %s", e)
+    try:
+        server = HTTPServer(("0.0.0.0", port), _Handler)
+        server.daemon_threads = True
+    except Exception as e:
+        logging.warning("HTTP keepalive server %s portda ochilmadi: %s", port, e)
+        return
 
-    threading.Thread(target=_run, daemon=True).start()
+    threading.Thread(target=server.serve_forever, daemon=True).start()
     logging.info("HTTP keepalive server %s portda ishga tushdi", port)
 
 
