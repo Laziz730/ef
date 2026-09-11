@@ -1,0 +1,9 @@
+services:
+  - type: worker
+    name: baklashga-bot
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python baklashga.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
