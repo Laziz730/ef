@@ -26,6 +26,7 @@ import os
 import random
 import re
 import string
+import threading
 import zipfile
 
 from aiogram import Bot, Dispatcher, F, Router
@@ -1901,7 +1902,46 @@ def _acquire_single_instance_lock():
     # o'zi bo'shatadi (garchi bu funksiya qaytib ketsa ham).
 
 
+def _start_http_keepalive():
+    """Render/railway kabi platformalar uchun.
+
+    Ularda deploy bo'lishi uchun app $PORT da HTTP ga javob berishi shart
+    (aks holda 'no port bound' deb deploy'ni bekor qiladi). Telegram bot
+    HTTP server talab qilmaydi, shuning uchun kichkina keepalive serverini
+    alohida thread'da ishga tushiramiz."""
+    try:
+        port = int(os.environ.get("PORT", "8080"))
+    except (TypeError, ValueError):
+        port = 8080
+
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def do_HEAD(self):
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *args):
+            pass
+
+    def _run():
+        try:
+            HTTPServer(("0.0.0.0", port), _Handler).serve_forever()
+        except Exception as e:
+            logging.warning("HTTP keepalive server ishga tushmadi: %s", e)
+
+    threading.Thread(target=_run, daemon=True).start()
+    logging.info("HTTP keepalive server %s portda ishga tushdi", port)
+
+
 if __name__ == "__main__":
+    _start_http_keepalive()
     _acquire_single_instance_lock()
     asyncio.run(main())
 
