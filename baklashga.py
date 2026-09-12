@@ -244,7 +244,14 @@ def save_allowed(ids: set[int]):
         json.dump(sorted(ids), f)
 
 
+def free_mode_enabled() -> bool:
+    """FREE_MODE=0/"false" qo'ysangiz to'lov qayta yoqiladi; standart BEPUL."""
+    return os.environ.get("FREE_MODE", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
 def is_free_user(user_id: int) -> bool:
+    if free_mode_enabled():
+        return True
     return user_id == ADMIN_ID or user_id in load_allowed()
 
 
