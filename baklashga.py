@@ -91,6 +91,7 @@ PRICE_FILES = {
     "code": os.path.join(os.path.dirname(__file__), "price_code.json"),
 }
 CREDITS_FILE = os.path.join(os.path.dirname(__file__), "credits.json")
+FREE_MODE_FILE = os.path.join(os.path.dirname(__file__), "free_mode.json")
 STATS_FILE = os.path.join(os.path.dirname(__file__), "stats.json")
 REFUND_REQUESTS_FILE = os.path.join(os.path.dirname(__file__), "refund_requests.json")
 REFERRALS_FILE = os.path.join(os.path.dirname(__file__), "referrals.json")
@@ -244,9 +245,30 @@ def save_allowed(ids: set[int]):
         json.dump(sorted(ids), f)
 
 
-def free_mode_enabled() -> bool:
+def _env_free_mode_default() -> bool:
     """FREE_MODE=0/"false" qo'ysangiz to'lov qayta yoqiladi; standart BEPUL."""
     return os.environ.get("FREE_MODE", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+def get_free_mode() -> bool:
+    """Hozirgi free rejim holati. Admin panel tugmasi free_mode.json'ga yozadi;
+    Redeploy bo'lsa env FREE_MODE (standart bepul) qayta asos bo'ladi."""
+    if os.path.exists(FREE_MODE_FILE):
+        try:
+            with open(FREE_MODE_FILE, encoding="utf-8") as f:
+                return bool(json.load(f).get("enabled", True))
+        except (OSError, json.JSONDecodeError):
+            pass
+    return _env_free_mode_default()
+
+
+def set_free_mode(flag: bool) -> None:
+    with open(FREE_MODE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"enabled": bool(flag)}, f)
+
+
+def free_mode_enabled() -> bool:
+    return get_free_mode()
 
 
 def is_free_user(user_id: int) -> bool:
@@ -1504,7 +1526,10 @@ async def _render_and_stage_logo_pack(message: Message, state: FSMContext):
 # ============================================================================
 
 def admin_keyboard():
+    free_state = "YOQ" if get_free_mode() else "O'CHIQ"
     return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=f"🆓 Free rejim: {free_state}", callback_data="adm:fmode", style="success"),
+    ], [
         InlineKeyboardButton(text="🆓 Bepul foydalanuvchilar", callback_data="adm:free", style="primary"),
     ], [
         InlineKeyboardButton(text="💰 Name emoji narxi", callback_data="adm:price_name", style="primary"),
@@ -1630,7 +1655,16 @@ async def admin_menu(callback: CallbackQuery, state: FSMContext):
         return
 
     action = callback.data.split(":")[1]
-    if action == "free":
+    if action == "fmode":
+        new_val = not get_free_mode()
+        set_free_mode(new_val)
+        state_label = "YOQ — hammasi bepul" if new_val else "O'CHIQ — to'lov kerak"
+        await callback.answer(f"Free rejim: {state_label}", show_alert=True)
+        await callback.message.answer(
+            f"🆓 Free rejim: {state_label}\n\nAdmin panel:", reply_markup=admin_keyboard()
+        )
+        return
+    elif action == "free":
         listing = "\n".join(str(i) for i in sorted(load_allowed())) or "(bo'sh)"
         await state.set_state(AdminFlow.add_id)
         await callback.message.answer(f"Bepul foydalanuvchilar:\n{listing}\n\nQo'shish uchun user_id yuboring:")
