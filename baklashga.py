@@ -1837,7 +1837,34 @@ async def errors_handler(event) -> bool:
     return True
 
 
+async def _render_self_ping():
+    """Render free plani 15 daqiqa kimsasiz bo'lsa servisni uxlatib qo'yadi.
+
+    Botdan Telegram'ga faqat OUTBOUND so'rovlar ketadi, shuning uchun Render
+    hech qanday trafikni hisoblamaydi va bot o'chiradi. Yechim: bot har 5
+    daqiqada O'ZINING umumiy (public) URL'iga so'rov yuboradi — bu Render
+    uchun INBOUND trafik hisoblanadi va servis hech qachon uxlamaydi.
+    Render `RENDER_EXTERNAL_URL` o'zgaruvchisini o'zi qo'yadi, kutilmas harakat
+    kerak emas."""
+    url = os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("KEEPALIVE_URL")
+    if not url:
+        return
+    logging.info("Render self-ping yoqildi: %s", url)
+    while True:
+        try:
+            import aiohttp
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                    if resp.status != 200:
+                        logging.warning("keepalive ping status %s", resp.status)
+        except Exception as e:
+            logging.warning("keepalive ping xatolik: %s", e)
+        await asyncio.sleep(300)
+
+
 async def main():
+    asyncio.create_task(_render_self_ping())
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)
